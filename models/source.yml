@@ -1,0 +1,15 @@
+version: 2
+
+sources:
+  - name: orders  # name of source
+    schema: landing
+    database: "{{ target.database }}"
+    tables:
+      - name: cust_order
+        identifier: raw_customer_order
+  - name: items  # 2nd name 
+    schema: landing
+    database: "{{ target.database }}"
+    tables:
+      - name: inventory
+        identifier: raw_inventory

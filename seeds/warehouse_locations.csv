@@ -1,0 +1,14 @@
+city_name,state_name,region,warehouse_name
+Mumbai,Maharashtra,West,WH-MUM-1
+Delhi,Delhi,North,WH-DEL-2
+Delhi,Delhi,North,WH-DEL-3
+Bengaluru,Karnataka,South,WH-BEN-4
+Bengaluru,Karnataka,South,WH-BEN-5
+Chennai,Tamil Nadu,South,WH-CHE-6
+Chennai,Tamil Nadu,South,WH-CHE-7
+Kolkata,West Bengal,East,WH-KOL-8
+Kolkata,West Bengal,East,WH-KOL-9
+Hyderabad,Telangana,South,WH-HYD-10
+Pune,Maharashtra,West,WH-PUN-11
+Ahmedabad,Gujarat,West,WH-AHM-12
+Ahmedabad,Gujarat,West,WH-AHM-13

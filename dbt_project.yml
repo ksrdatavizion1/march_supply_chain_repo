@@ -1,4 +1,3 @@
-
 # Name your project! Project names should contain only lowercase characters
 # and underscores. A good package name should reflect your organization's
 # name or the intended use of these models
@@ -38,5 +37,47 @@ clean-targets:         # directories to be removed by `dbt clean`
 models:
   my_new_project:
     # Applies to all files under models/example/
-    example:
+    raw:
       +materialized: table
+      +schema: raw
+    silver:
+      +materialized: table
+      +schema: silver
+    gold:
+      +materialized: table
+      +schema: gold
+seeds:
+  my_new_project:  # Replace with your actual dbt project name
+    warehouse_locations:
+      +schema: raw
+      +quote_columns: false
+      +column_types:
+        city_name: VARCHAR(50)
+        state_name: VARCHAR(50)
+        region: VARCHAR(20)
+        warehouse_name: VARCHAR(50)
+      +post-hook:
+        - >
+          INSERT INTO SUPPLY_CHAIN.AUDIT.MODEL_EXECUTION_LOG (
+            model_name,
+            load_date,
+            row_count,
+            file_name,
+            last_modified,
+            status,
+            comments
+          )
+          SELECT
+          'warehouse_locations',
+          CURRENT_TIMESTAMP,
+          COUNT(*),
+          'warehouse_locations.csv',
+          CURRENT_TIMESTAMP,
+          'SUCCESS',
+          'Seed loaded via dbt seed'
+          FROM SUPPLY_CHAIN.DEV__RAW.WAREHOUSE_LOCATIONS
+          WHERE NOT EXISTS (
+          SELECT 1
+          FROM SUPPLY_CHAIN.AUDIT.MODEL_EXECUTION_LOG
+          WHERE model_name = 'warehouse_locations'
+            AND row_count = (SELECT COUNT(*) FROM SUPPLY_CHAIN.DEV__RAW.WAREHOUSE_LOCATIONS))
