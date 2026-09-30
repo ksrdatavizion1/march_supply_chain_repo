@@ -1,0 +1,456 @@
+version: 2
+
+models:
+  - name: Customer_order
+    description: "Transformed customer order data with enriched and cleaned columns."
+    columns:
+      - name: order_id
+        description: "Unique identifier for each order."
+        data_tests:
+          - unique:
+              config:
+                description: "Ensures each order_id is unique with no duplicates."
+          - not_null:
+              config:
+                description: "Checks that order_id is never null, ensuring every record has an identifier."
+      - name: customer_id
+        description: "Identifier for the customer placing the order."
+        data_tests:
+          - not_null:
+              config:
+                description: "Validates that every order has an associated customer_id."
+      - name: order_date
+        description: "The date when the order was placed."
+        data_tests:
+          - not_null:
+              config:
+                description: "Ensures that the order date is always provided."
+      - name: CUSTOMER_EMAIL
+        description: "Email address of the customer."
+        data_tests:
+          - not_null:
+              config:
+                description: "Checks that customer_email is never empty."
+          - valid_email_format:
+              config:
+                severity: warn
+                tags: [raw]
+                description: "Warns if the email format is invalid but does not fail the test."
+      - name: customer_phone
+        description: "Phone number of the customer; should be 10 digits."
+        data_tests:
+          - not_null:
+              config:
+                description: "Ensures phone number is provided for all records."
+          - column_length_is:
+              arguments:
+                expected_length: 10
+              config:
+                tags: [raw]
+                description: "Verifies the phone number is exactly 10 digits long."
+      - name: quantity
+        description: "Quantity of items in the order."
+        data_tests:
+          - not_null:
+              config:
+                description: "Validates that quantity is never missing."
+      - name: fuel_type
+        description: "Fuel type of the item in the order."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Petrol', 'Diesel', 'Electric', 'Hybrid']
+              config:
+                description: "Checks that fuel_type values are only one of the allowed set."
+
+  - name: item_inventory
+    description: "Cleaned and categorized inventory of items including fuel and variant types."
+    columns:
+      - name: item_id
+        description: "Unique identifier for each item."
+        data_tests:
+          - unique:
+              config:
+                description: "Ensures each item_id is unique in the inventory."
+          - not_null:
+              config:
+                description: "Checks that every item has a non-null identifier."
+      - name: item_name
+        description: "Name of the item."
+        data_tests:
+          - not_null:
+              config:
+                description: "Validates that item_name is always provided."
+      - name: category
+        description: "Vehicle category the item belongs to (e.g., SUV, Sedan)."
+        data_tests:
+          - not_null:
+              config:
+                description: "Ensures the category field is never empty."
+          - accepted_values:
+              arguments:
+                values: ['SUV', 'Sedan', 'Hatchback', 'Truck']
+              config:
+                severity: warn
+                description: "Warns if category contains unexpected values."
+      - name: fuel_type
+        description: "Fuel type associated with the item."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Petrol', 'Diesel', 'Electric', 'Hybrid']
+              config:
+                description: "Checks fuel_type values are limited to the expected set."
+  - name: fact_customer_order
+    description: >
+      Fact table recording transactional customer order details including quantities, pricing, warehouse, and location information.
+    columns:
+      - name: ORDER_ID
+        description: "Unique identifier for each order."
+      - name: LINE_NUM
+        description: "Line number representing individual items within an order."
+      - name: CUSTOMER_ID
+        description: "Identifier for the customer placing the order."
+      - name: ITEM_ID
+        description: "Identifier for the ordered item."
+      - name: WAREHOUSE_NAME
+        description: "Name of the warehouse fulfilling the order."
+      - name: CITY_NAME
+        description: "City where the warehouse is located."
+      - name: ORDER_DATE
+        description: "Date when the order was placed."
+      - name: ORDER_WEEK
+        description: "Week start date derived from ORDER_DATE."
+      - name: QUANTITY
+        description: "Quantity of items ordered."
+      - name: UNIT_PRICE
+        description: "Price per unit of the item."
+      - name: TOTAL_PRICE
+        description: "Calculated total price (quantity * unit price)."
+      - name: SNAPSHOT_TS
+        description: "Timestamp when the snapshot record was created."
+
+  - name: dim_item
+    description: >
+      Dimension table for item metadata including fuel classification, variant info, and category tagging.
+      Sourced from the item_inventory_snapshot with current records only.
+    columns:
+      - name: ITEM_ID
+        description: "Unique identifier for each item."
+      - name: ITEM_NAME
+        description: "Name of the item."
+      - name: CATEGORY
+        description: "Vehicle or product category (e.g., SUV, Sedan)."
+      - name: VARIANT_NAME
+        description: "Specific variant or version of the item."
+      - name: FUEL_TYPE_CLEANED
+        description: "Normalized fuel type (Petrol, Diesel, Electric, Hybrid, Other)."
+      - name: VARIANT_TYPE
+        description: "Extracted variant classification from VARIANT_NAME."
+      - name: UNIQUE_IDENTIFIER
+        description: "Composite identifier combining ITEM_NAME, CATEGORY, and VARIANT_NAME."
+      - name: IS_ELECTRIC
+        description: "Boolean flag indicating if the item is electric."
+      - name: IS_HYBRID
+        description: "Boolean flag indicating if the item is hybrid."
+      - name: VEHICLE_TYPE
+        description: "Classification of vehicle type (Heavy, Light, Other) based on category."
+
+  - name: dim_customer
+    description: >
+      Dimension table with enriched customer data derived from current customer orders.
+      Used for segmentation, churn analysis, and customer profiling.
+    columns:
+      - name: CUSTOMER_ID
+        description: "Unique identifier for each customer."
+      - name: CUSTOMER_NAME
+        description: "Customer's full name."
+      - name: CUSTOMER_EMAIL
+        description: "Customer's email address."
+      - name: CUSTOMER_PHONE
+        description: "Customer's contact phone number."
+      - name: CITY_NAME
+        description: "Customer's city of residence."
+
+  - name: dim_date
+    description: >
+      Standard date dimension table supporting time-based slicing and reporting.
+      Generates dates from minimum order date up to the current date.
+    columns:
+      - name: DATE_KEY
+        description: "The actual date value used as the primary key."
+      - name: YEAR
+        description: "Year part of the date."
+      - name: MONTH
+        description: "Month part of the date."
+      - name: DAY
+        description: "Day part of the date."
+      - name: DAY_NAME
+        description: "Name of the day (e.g., Monday)."
+      - name: MONTH_NAME
+        description: "Name of the month (e.g., January)."
+      - name: WEEK_START_DATE
+        description: "Start date of the week containing the date."
+
+  - name: dim_warehouse
+    description: >
+      Dimension table containing standardized warehouse metadata.
+      Extracted from silver layer, capturing latest warehouse info per location.
+    columns:
+      - name: WAREHOUSE_NAME
+        description: "Name of the warehouse."
+      - name: CITY_NAME
+        description: "City where the warehouse is located."
+      - name: STATE_NAME
+        description: "State where the warehouse is located."
+      - name: REGION
+        description: "Geographical region of the warehouse."
+
+  - name: customer_order_final_view
+    description: >
+      Final consolidated view combining fact and dimension tables to support comprehensive customer order analysis.
+      Joins fact customer orders with customer, item, warehouse, and date dimensions to provide enriched order information.
+    columns:
+      - name: ORDER_ID
+        description: "Unique identifier for each order."
+      - name: LINE_NUM
+        description: "Line number representing individual items within an order."
+      - name: ORDER_DATE
+        description: "Date when the order was placed."
+      - name: ORDER_WEEK
+        description: "Week start date derived from ORDER_DATE."
+      - name: QUANTITY
+        description: "Quantity of items ordered."
+      - name: UNIT_PRICE
+        description: "Price per unit of the item."
+      - name: TOTAL_PRICE
+        description: "Total price for the line item (quantity * unit price)."
+      - name: SNAPSHOT_TS
+        description: "Timestamp when the snapshot record was created."
+      - name: ORDER_YEAR
+        description: "Year component of the order date."
+      - name: ORDER_MONTH
+        description: "Month component of the order date."
+      - name: ORDER_DAY
+        description: "Day component of the order date."
+      - name: ORDER_DAY_NAME
+        description: "Name of the day of the week for the order date."
+      - name: ORDER_MONTH_NAME
+        description: "Name of the month for the order date."
+      - name: ORDER_WEEK_START
+        description: "Start date of the week containing the order date."
+      - name: CUSTOMER_ID
+        description: "Unique identifier for the customer."
+      - name: CUSTOMER_NAME
+        description: "Full name of the customer."
+      - name: CUSTOMER_EMAIL
+        description: "Email address of the customer."
+      - name: CUSTOMER_PHONE
+        description: "Phone number of the customer."
+      - name: CUSTOMER_CITY
+        description: "City of the customer."
+      - name: ITEM_ID
+        description: "Unique identifier for the item."
+      - name: ITEM_NAME
+        description: "Name of the item."
+      - name: CATEGORY
+        description: "Category of the item (e.g., SUV, Sedan)."
+      - name: VARIANT_NAME
+        description: "Variant or model name of the item."
+      - name: FUEL_TYPE_CLEANED
+        description: "Normalized fuel type (Petrol, Diesel, Electric, Hybrid, Other)."
+      - name: IS_ELECTRIC
+        description: "Boolean flag indicating if the item uses electric fuel."
+      - name: IS_HYBRID
+        description: "Boolean flag indicating if the item is a hybrid vehicle."
+      - name: VEHICLE_TYPE
+        description: "Classification of the vehicle type (Heavy, Light, Other)."
+      - name: WAREHOUSE_NAME
+        description: "Name of the warehouse fulfilling the order."
+      - name: WAREHOUSE_CITY
+        description: "City location of the warehouse."
+      - name: STATE_NAME
+        description: "State location of the warehouse."
+      - name: REGION
+        description: "Geographic region of the warehouse."
+
+  - name: top_items_by_quantity
+    description: >
+      View showcasing the top 20 best-selling items based on total quantity sold.
+      Aggregates sales quantities by item name, category, and variant.
+    columns:
+      - name: ITEM_NAME
+        description: "Name of the item."
+      - name: CATEGORY
+        description: "Category of the item."
+      - name: VARIANT_NAME
+        description: "Variant name of the item."
+      - name: total_units_sold
+        description: "Total quantity of the item sold across all orders."
+
+  - name: warehouse_count_by_region
+    description: >
+      Aggregated view showing the count of distinct warehouses grouped by geographic region.
+      Useful for understanding warehouse distribution by region.
+    columns:
+      - name: REGION
+        description: "Geographic region name."
+      - name: warehouse_count
+        description: "Count of distinct warehouses in the region."
+
+  - name: weekly_sales_summary
+    description: >
+      Summarized weekly sales data by order week.
+      Provides total sales amount, units sold, and distinct orders count for performance and trend analysis.
+    columns:
+      - name: ORDER_WEEK
+        description: "Week start date for sales aggregation."
+      - name: total_sales
+        description: "Sum of total sales amount for the week."
+      - name: total_units_sold
+        description: "Sum of quantity of items sold during the week."
+      - name: total_orders
+        description: "Count of distinct orders placed during the week."
+    
+
+snapshots:
+  - name: customer_order_snapshot
+    config:
+      tags: ['silver']
+    description: >
+      Snapshot that tracks changes in customer orders using 'order_id' as the unique key.
+      Uses the 'check' strategy to detect changes based on specified columns.
+      Tagged as 'silver' to represent the data layer.
+      Runs a post-hook to log execution details after snapshot completion.
+      Designed for slowly changing dimensions (SCD) tracking over time.
+    columns:
+      - name: order_id
+        description: "Unique identifier for each order."
+      - name: line_num
+        description: "Line number of the order item."
+      - name: customer_id
+        description: "Identifier for the customer who placed the order."
+      - name: customer_name
+        description: "Customer's name, normalized to proper case."
+      - name: customer_email
+        description: "Customer's email address in lowercase."
+      - name: customer_phone
+        description: "Customer's phone number."
+      - name: city_name
+        description: "City name of the customer, normalized to proper case."
+      - name: item_id
+        description: "Identifier for the item ordered."
+      - name: item_name
+        description: "Name of the ordered item, normalized to proper case."
+      - name: variant_name
+        description: "Variant name of the item, normalized to proper case."
+      - name: fuel_type
+        description: "Fuel type of the item, normalized to proper case."
+      - name: warehouse_name
+        description: "Name of the warehouse fulfilling the order."
+      - name: order_date
+        description: "Date when the order was placed."
+      - name: quantity
+        description: "Quantity of items ordered."
+      - name: unit_price
+        description: "Price per unit of the item."
+      - name: total_price
+        description: "Derived field: quantity multiplied by unit price."
+      - name: order_week
+        description: "Derived field: the week start date of the order_date."
+      - name: snapshot_ts
+        description: "Timestamp when the snapshot record was created."
+    data_tests:
+      - no_special_chars:
+          arguments:
+            column_names: ["customer_name", "city_name", "item_name", "fuel_type"]
+          config:
+            tags: ['silver']
+            description: "Ensures these text columns contain no special characters."
+
+  - name: item_inventory_snapshot
+    config:
+      tags: ['silver']
+    description: >
+      Snapshot capturing enriched item inventory data.
+      Tracks changes using 'ITEM_ID' as the unique key with 'check' strategy.
+      Includes normalized fuel types, extracted variant types, unique identifiers, and flags for electric/hybrid items.
+      Classifies vehicle types and logs execution details via post-hook after snapshot completion.
+    columns:
+      - name: ITEM_ID
+        description: "Unique identifier for each inventory item."
+      - name: ITEM_NAME
+        description: "Name of the inventory item."
+      - name: CATEGORY
+        description: "Category of the vehicle/item (e.g., SUV, Sedan, Truck)."
+      - name: VARIANT_NAME
+        description: "Variant details of the item."
+      - name: fuel_type_cleaned
+        description: >
+          Normalized fuel type derived from raw fuel_type field.
+          Values include Petrol, Diesel, Electric, Hybrid, or Other.
+      - name: variant_type
+        description: "Extracted variant type from VARIANT_NAME (e.g., Deluxe, Eco)."
+      - name: unique_identifier
+        description: "Concatenation of ITEM_NAME, CATEGORY, and VARIANT_NAME forming a unique name."
+      - name: is_electric
+        description: "Boolean flag indicating if the item is electric."
+      - name: is_hybrid
+        description: "Boolean flag indicating if the item is hybrid."
+      - name: vehicle_type
+        description: >
+          Derived vehicle type based on CATEGORY, categorized as Heavy, Light, or Other.
+    tests: []  # Add tests here if needed
+
+macros:
+  - name: copy_into_inventory
+    description: Loads raw inventory data from the external stage `@ext_stage_storage_int/item_catalog/` into the `LANDING.raw_inventory` table. 
+                 Parses and casts file fields into defined columns, includes file metadata, and appends a load timestamp. 
+                 Skips problematic rows using `ON_ERROR = 'CONTINUE'`.
+                 This macro does not accept arguments. It uses predefined stage and file format settings.
+
+  - name: copy_into_customer_order
+    description: Loads raw customer order data from the external stage `@ext_stage_storage_int/customer_order/` into the `LANDING.raw_customer_order` table. 
+                 Parses and casts file fields into typed columns (order, customer, item, price, and date details), includes file metadata, 
+                 and appends a load timestamp. Skips problematic rows using `ON_ERROR = 'CONTINUE'`.
+                 This macro does not accept arguments. It uses predefined stage and file format settings.
+  - name: generate_schema_name
+    description: Determines the schema name for a model based on the provided `custom_schema_name`. 
+                 Defaults to the target schema if no value is provided, uses `landing` directly if specified, 
+                 otherwise appends the custom schema name to the target schema.
+    arguments:
+      - name: custom_schema_name
+        type: string
+        description: Custom schema name to be applied to the model.
+      - name: node
+        type: str
+        description: The model, seed, or snapshot node passed automatically by dbt when resolving schema names.
+
+  - name: log_model_execution
+    description: Inserts an execution log entry into `SUPPLY_CHAIN.AUDIT.MODEL_EXECUTION_LOG` for the specified model and table. 
+                 Logs model name, timestamp, row count, and a success message if the model has not already been logged for the current date. 
+                 Used for auditing and tracking model or snapshot runs.
+    arguments:
+      - name: model_name
+        type: string
+        description: Name of the model being executed.
+      - name: table_name
+        type: string
+        description: Reference to the table from which the row count will be derived for logging.
+seeds:
+  - name: warehouse_locations
+    config:
+      tags: ['raw']
+    description: >
+      This seed contains warehouse location details including city, state, region,
+      and warehouse name. It serves as reference data for warehouse metadata
+      used in supply chain models and analytics.
+    columns:
+      - name: city_name
+        description: "Name of the city where the warehouse is located."
+      - name: state_name
+        description: "Name of the state where the warehouse is located."
+      - name: region
+        description: "Geographical region (e.g., North, South, East, West)."
+      - name: warehouse_name
+        description: "Unique identifier or code for the warehouse."
